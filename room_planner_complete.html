@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Room Planner - インテリア設計シミュレーター</title>
+<style>
+:root{--bg:#f3f4f6;--panel:#fff;--line:#d8dbe0;--text:#202124;--muted:#6b7280;--accent:#222}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif;color:var(--text);background:var(--bg);overflow:hidden}
+header{height:58px;background:#202124;color:#fff;display:flex;align-items:center;padding:0 18px;justify-content:space-between}
+header h1{font-size:18px;margin:0}.header-note{font-size:12px;opacity:.8}
+.app{height:calc(100vh - 58px);display:grid;grid-template-columns:300px 1fr 270px}
+aside{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:16px}
+aside.right{border-right:0;border-left:1px solid var(--line)}
+h2{font-size:14px;margin:4px 0 10px}.section{padding-bottom:16px;margin-bottom:16px;border-bottom:1px solid #eee}
+label{font-size:12px;color:var(--muted);display:block;margin:8px 0 4px}
+input,select,button{font:inherit}input,select{width:100%;padding:9px;border:1px solid #cfd2d7;border-radius:7px;background:#fff}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+button{border:1px solid #cfd2d7;background:#fff;border-radius:7px;padding:8px;cursor:pointer}
+button:hover{background:#f1f3f4}button.primary{background:#202124;color:#fff;border-color:#202124}
+button.danger{color:#b42318}.btnrow{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.hint{font-size:11px;color:var(--muted);line-height:1.5;margin:8px 0}
+.tools{display:grid;grid-template-columns:1fr 1fr;gap:7px}.tools button{font-size:12px}
+.center{position:relative;overflow:hidden;background:#e9eaec}
+.toolbar{height:48px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:7px;padding:7px 10px}
+.toolbar button{padding:6px 10px;font-size:12px}.toolbar .spacer{flex:1}.zoom{font-size:12px;color:var(--muted)}
+.canvas{position:absolute;left:0;right:0;top:48px;bottom:0;overflow:auto;padding:40px}
+.room-shell{display:inline-block;background:#cfd1d4;padding:14px;border-radius:10px;box-shadow:0 5px 18px #0002}
+#room{position:relative;background:#fff;border:2px solid #222;transform-origin:top left;background-image:linear-gradient(to right,#dfe2e5 1px,transparent 1px),linear-gradient(to bottom,#dfe2e5 1px,transparent 1px)}
+.wall-label{position:absolute;pointer-events:none;color:#777;font-size:10px;background:#fff8;padding:1px 3px}
+.furniture{position:absolute;border:2px solid #555;background:#e5e7eb;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.25;font-size:11px;cursor:grab;user-select:none;touch-action:none;overflow:hidden}
+.furniture.selected{outline:3px solid #111;z-index:20}.furniture.dragging{cursor:grabbing;opacity:.82}
+.door,.window{position:absolute;z-index:5}.door{border:2px solid #8b5e3c;background:#ead7c5}.window{background:#d7eef8;border:2px solid #3b82a6}
+.item{border:1px solid #ddd;border-radius:8px;padding:9px;margin:7px 0;cursor:pointer}.item.sel{border:2px solid #222;padding:8px}.item-title{font-size:13px;font-weight:600}.item-meta{font-size:11px;color:var(--muted);margin-top:3px}
+.badge{display:inline-block;font-size:10px;background:#eee;border-radius:10px;padding:2px 6px;margin-left:4px}
+.empty{color:#888;font-size:13px;padding:30px}
+.kbd{font-size:10px;border:1px solid #ccc;border-bottom-width:2px;border-radius:4px;padding:1px 4px;background:#fafafa}
+#selectedEmpty{color:#777;font-size:12px;line-height:1.6}
+footer{font-size:10px;color:#888;margin-top:10px}
+@media(max-width:900px){.app{grid-template-columns:250px 1fr}.right{display:none}}
+</style>
+</head>
+<body>
+<header><h1>🏠 Room Planner — インテリア設計シミュレーター</h1><div class="header-note">5cm = 1マス</div></header>
+<div class="app">
+<aside>
+<div class="section">
+<h2>① 部屋サイズ</h2>
+<div class="row"><div><label>幅（cm）</label><input id="roomW" type="number" value="360" min="5" step="5"></div><div><label>奥行き（cm）</label><input id="roomD" type="number" value="270" min="5" step="5"></div></div>
+<button class="primary" style="width:100%;margin-top:9px" id="makeRoom">部屋を作る</button>
+<div class="hint">5cmを1マスとして自動換算。例えば360×270cm → 72×54マス。</div>
+</div>
+<div class="section">
+<h2>② 家具を追加</h2>
+<select id="furnitureType"></select>
+<div class="row" style="margin-top:8px"><input id="customW" type="number" placeholder="幅 cm"><input id="customD" type="number" placeholder="奥行 cm"></div>
+<button id="addFurniture" class="primary" style="width:100%;margin-top:8px">＋ 家具を追加</button>
+<div class="hint">サイズ欄を入力すると、選択した家具の実寸を変更して追加できます。</div>
+</div>
+<div class="section">
+<h2>③ ドア・窓</h2>
+<div class="row">
+<button id="addDoor">🚪 ドア</button><button id="addWindow">🪟 窓</button>
+</div>
+</div>
+<div class="section">
+<h2>④ 操作</h2>
+<div class="tools">
+<button id="rotate">↻ 90°回転</button><button id="duplicate">＋ 複製</button>
+<button id="delete" class="danger">🗑 削除</button><button id="center">中央へ</button>
+</div>
+<div class="hint">家具をドラッグして移動。矢印キーでも1マスずつ移動できます。<span class="kbd">Delete</span>で削除。</div>
+</div>
+<div class="section">
+<h2>⑤ 保存・復元</h2>
+<div class="btnrow"><button id="save">💾 保存</button><button id="load">📂 読み込み</button></div>
+<button id="clear" class="danger" style="width:100%;margin-top:7px">新しい部屋にする</button>
+</div>
+<footer>このファイルだけで動作します。データはブラウザ内に保存できます。</footer>
+</aside>
+
+<main class="center">
+<div class="toolbar">
+<button id="zoomOut">−</button><button id="zoomIn">＋</button><span class="zoom" id="zoomText">100%</span>
+<button id="fit">画面に合わせる</button><span class="spacer"></span>
+<span class="zoom" id="sizeText"></span>
+</div>
+<div class="canvas" id="canvas"><div class="room-shell"><div id="room"></div></div></div>
+</main>
+
+<aside class="right">
+<div class="section"><h2>選択中</h2><div id="selectedEmpty">家具やドア・窓をクリックすると、ここで詳細を編集できます。</div><div id="editor" style="display:none">
+<label>名前</label><input id="editName">
+<div class="row"><div><label>幅（cm）</label><input id="editW" type="number" min="1"></div><div><label>奥行（cm）</label><input id="editD" type="number" min="1"></div></div>
+<label>回転</label><select id="editRot"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select>
+<button id="applyEdit" class="primary" style="width:100%;margin-top:8px">変更を反映</button>
+</div></div>
+<div class="section"><h2>家具・設備一覧</h2><div id="list"></div></div>
+<div class="section"><h2>部屋情報</h2><div class="hint" id="roomInfo"></div></div>
+</aside>
+</div>
+
+<script>
+const SCALE=5, BASE=12;
+let zoom=1, room={w:360,d:270,cw:72,cd:54}, objects=[], selected=null, nextId=1, drag=null;
+const catalog=[
+ {key:"bed",name:"ベッド",w:195,d:97,emoji:"🛏️"},
+ {key:"sofa",name:"ソファ",w:180,d:80,emoji:"🛋️"},
+ {key:"desk",name:"デスク",w:120,d:60,emoji:"🪑"},
+ {key:"table",name:"テーブル",w:120,d:75,emoji:""},
+ {key:"shelf",name:"本棚",w:80,d:30,emoji:"📚"},
+ {key:"tv",name:"テレビ台",w:120,d:40,emoji:"📺"},
+ {key:"chair",name:"チェア",w:50,d:50,emoji:"🪑"},
+ {key:"fridge",name:"冷蔵庫",w:60,d:65,emoji:"🧊"}
+];
+const $=id=>document.getElementById(id), grid=cm=>Math.max(1,Math.ceil(cm/SCALE));
+function fillCatalog(){ $("furnitureType").innerHTML=catalog.map(c=>`<option value="${c.key}">${c.emoji} ${c.name}（${c.w}×${c.d}cm）</option>`).join("");}
+function dims(o){let a=grid(o.w),b=grid(o.d);return o.rot%180?[b,a]:[a,b]}
+function clamp(o){let [w,d]=dims(o);o.x=Math.max(0,Math.min(o.x,room.cw-w));o.y=Math.max(0,Math.min(o.y,room.cd-d));}
+function makeRoom(){
+ let w=+$("roomW").value,d=+$("roomD").value;if(!w||!d||w<5||d<5)return alert("幅と奥行きを正しく入力してください。");
+ room={w,d,cw:grid(w),cd:grid(d)};objects=[];selected=null;render();
+}
+function add(type,w,d,name,emoji,kind="furniture"){
+ let o={id:nextId++,kind,type,name,w,d,emoji,rot:0,x:0,y:0};let [gw,gd]=dims(o);
+ o.x=Math.max(0,Math.floor((room.cw-gw)/2));o.y=Math.max(0,Math.floor((room.cd-gd)/2));objects.push(o);selected=o.id;render();
+}
+function addFurniture(){
+ let c=catalog.find(x=>x.key===$("furnitureType").value),w=+$("customW").value||c.w,d=+$("customD").value||c.d;
+ add(c.key,w,d,c.name,c.emoji);$("customW").value="";$("customD").value="";
+}
+function addSpecial(kind){
+ if(kind==="door")add("door",80,10,"ドア","🚪","door");else add("window",120,10,"窓","🪟","window");
+}
+function select(id){selected=id;render();}
+function selectedObj(){return objects.find(o=>o.id===selected)}
+function rotate(){let o=selectedObj();if(!o)return;o.rot=(o.rot+90)%360;clamp(o);render()}
+function duplicate(){let o=selectedObj();if(!o)return;let n={...o,id:nextId++,x:o.x+2,y:o.y+2};clamp(n);objects.push(n);selected=n.id;render()}
+function remove(){if(selected==null)return;objects=objects.filter(o=>o.id!==selected);selected=null;render()}
+function centerObj(){let o=selectedObj();if(!o)return;let [w,d]=dims(o);o.x=Math.floor((room.cw-w)/2);o.y=Math.floor((room.cd-d)/2);render()}
+function render(){
+ let r=$("room");r.innerHTML="";r.style.width=room.cw*BASE*zoom+"px";r.style.height=room.cd*BASE*zoom+"px";r.style.backgroundSize=BASE*zoom+"px "+BASE*zoom+"px";
+ $("zoomText").textContent=Math.round(zoom*100)+"%";$("sizeText").textContent=`${room.w} × ${room.d} cm / ${room.cw} × ${room.cd} マス`;
+ $("roomInfo").innerHTML=`実寸：<b>${room.w} × ${room.d} cm</b><br>グリッド：<b>${room.cw} × ${room.cd} マス</b><br>1マス：5cm`;
+ objects.forEach(o=>{clamp(o);let [gw,gd]=dims(o);let el=document.createElement("div");el.className=(o.kind==="furniture"?"furniture ":o.kind)+" "+(o.id===selected?"selected":"");el.dataset.id=o.id;el.style.left=o.x*BASE*zoom+"px";el.style.top=o.y*BASE*zoom+"px";el.style.width=gw*BASE*zoom+"px";el.style.height=gd*BASE*zoom+"px";el.innerHTML=`${o.emoji||""} ${o.name}<br><small>${o.w}×${o.d}cm</small>`;el.onpointerdown=startDrag;el.onclick=e=>{e.stopPropagation();select(o.id)};r.appendChild(el)});
+ r.onclick=()=>{selected=null;render()};updateEditor();updateList();
+}
+function startDrag(e){
+ e.preventDefault();e.stopPropagation();let o=objects.find(x=>x.id==+e.currentTarget.dataset.id);selected=o.id;
+ drag={o,startX:e.clientX,startY:e.clientY,ox:o.x,oy:o.y};e.currentTarget.setPointerCapture?.(e.pointerId);
+ e.currentTarget.onpointermove=moveDrag;e.currentTarget.onpointerup=endDrag;
+}
+function moveDrag(e){if(!drag)return;let o=drag.o;let step=BASE*zoom;o.x=drag.ox+Math.round((e.clientX-drag.startX)/step);o.y=drag.oy+Math.round((e.clientY-drag.startY)/step);clamp(o);let el=document.querySelector(`[data-id="${o.id}"]`);if(el){el.style.left=o.x*step+"px";el.style.top=o.y*step+"px"}updateEditor()}
+function endDrag(){drag=null;render()}
+function updateEditor(){
+ let o=selectedObj();$("selectedEmpty").style.display=o?"none":"block";$("editor").style.display=o?"block":"none";if(!o)return;
+ $("editName").value=o.name;$("editW").value=o.w;$("editD").value=o.d;$("editRot").value=o.rot;
+}
+function applyEdit(){let o=selectedObj();if(!o)return;o.name=$("editName").value||o.name;o.w=Math.max(1,+$("editW").value||o.w);o.d=Math.max(1,+$("editD").value||o.d);o.rot=+$("editRot").value;clamp(o);render()}
+function updateList(){let box=$("list");box.innerHTML=objects.length?objects.map(o=>`<div class="item ${o.id===selected?"sel":""}" data-list="${o.id}"><div class="item-title">${o.emoji||""} ${o.name}<span class="badge">${o.kind==="furniture"?"家具":o.kind==="door"?"ドア":"窓"}</span></div><div class="item-meta">${o.w} × ${o.d} cm　回転 ${o.rot}°</div></div>`).join(""):'<div class="hint">まだ配置されていません。</div>';box.querySelectorAll(".item").forEach(el=>el.onclick=()=>select(+el.dataset.list))}
+function saveData(){localStorage.setItem("roomPlanner",JSON.stringify({room,objects,nextId}));alert("現在の設計を保存しました。")}
+function loadData(){let s=localStorage.getItem("roomPlanner");if(!s)return alert("保存データがありません。");try{let x=JSON.parse(s);room=x.room;objects=x.objects||[];nextId=x.nextId||1;$("roomW").value=room.w;$("roomD").value=room.d;selected=null;render()}catch(e){alert("保存データを読み込めませんでした。")}}
+function fit(){let c=$("canvas"),w=room.cw*BASE+28,h=room.cd*BASE+28;zoom=Math.min((c.clientWidth-30)/w,(c.clientHeight-30)/h,2);zoom=Math.max(.35,zoom);render()}
+$("makeRoom").onclick=makeRoom;$("addFurniture").onclick=addFurniture;$("addDoor").onclick=()=>addSpecial("door");$("addWindow").onclick=()=>addSpecial("window");$("rotate").onclick=rotate;$("duplicate").onclick=duplicate;$("delete").onclick=remove;$("center").onclick=centerObj;$("save").onclick=saveData;$("load").onclick=loadData;$("clear").onclick=()=>{if(confirm("現在の家具をすべて消して新しい部屋にしますか？"))makeRoom()};
+$("applyEdit").onclick=applyEdit;$("zoomIn").onclick=()=>{zoom=Math.min(3,zoom*1.15);render()};$("zoomOut").onclick=()=>{zoom=Math.max(.3,zoom/1.15);render()};$("fit").onclick=fit;
+document.addEventListener("keydown",e=>{if(e.key==="Delete"){remove();return}let o=selectedObj();if(!o)return;if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(e.key)){e.preventDefault();if(e.key==="ArrowLeft")o.x--;if(e.key==="ArrowRight")o.x++;if(e.key==="ArrowUp")o.y--;if(e.key==="ArrowDown")o.y++;clamp(o);render()}});
+fillCatalog();render();
+</script>
+</body>
+</html>
